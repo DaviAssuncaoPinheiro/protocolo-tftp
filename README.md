@@ -1,1 +1,145 @@
-# protocolo-tftp
+﻿protocolo-tftp
+==============
+
+Implementação simples do protocolo **TFTP** (Trivial File Transfer Protocol) em Python, contendo:
+
+- Cliente em linha de comando (`tftp_client.py`)
+- Servidor em linha de comando (`tftp_server.py`)
+- Módulo de montagem e parsing de pacotes TFTP (`tftp_packet.py`)
+
+O objetivo é demonstrar, de forma didática, como o TFTP funciona sobre UDP, incluindo:
+numeração de blocos, retransmissão em caso de timeout, códigos de erro e controle de diretório base no servidor.
+
+---
+
+### Visão geral arquitetural (diagramas C4)
+
+#### Diagrama de Contexto
+
+O contexto do sistema pode ser visualizado no diagrama abaixo:
+
+![Diagrama de Contexto - TFTP](assets/diagrama-contexto-tftp.png)
+
+**Descrição rápida**:
+
+- **Usuário**: executa cliente/servidor via linha de comando.
+- **Sistema TFTP**: meio por onde trafegam os pacotes TFTP entre cliente e servidor.
+
+#### Diagrama de Containers
+
+O sistema é dividido em três containers principais (`tftp_client.py`, `tftp_server.py`, `tftp_packet.py`) e o sistema de arquivos:
+
+![Diagrama de Containers - TFTP](assets/diagrama-containers-tftp.png)
+
+- `tftp_client.py`: envia RRQ/WRQ, recebe DATA/ERROR, envia ACK, grava/lê arquivos locais.
+- `tftp_server.py`: escuta porta UDP, trata RRQ/WRQ, envia/recebe DATA/ACK/ERROR, lê/escreve arquivos no `base_dir`.
+- `tftp_packet.py`: monta e interpreta pacotes TFTP (RRQ, WRQ, DATA, ACK, ERROR).
+- **Sistema de Arquivos**: armazena arquivos locais (cliente) e remotos (servidor).
+
+#### Diagrama de Componentes
+
+Os componentes internos de cada container são apresentados no diagrama de componentes:
+
+![Diagrama de Componentes - TFTP](assets/diagrama-componentes-tftp.png)
+
+Principais componentes:
+
+- `TFTPClient` (no `tftp_client.py`): implementa `download()` e `upload()`, usando o módulo `tftp_packet`.
+- `TFTPServer` (no `tftp_server.py`): implementa `serve_forever()`, `_handle_rrq()` e `_handle_wrq()`, usando threads para múltiplas requisições.
+- CLI de cliente e servidor: usam `argparse` para interpretar parâmetros da linha de comando.
+- Funções de pacote TFTP (`tftp_packet.py`): `build_rrq`, `build_wrq`, `build_data`, `build_ack`, `build_error`, `parse_packet`.
+
+---
+
+### Requisitos
+
+- Python 3.11+ (recomendado)
+- Sistema operacional com suporte a sockets UDP (Windows, Linux ou macOS)
+
+Não há dependências externas além da biblioteca padrão do Python.
+
+---
+
+### Estrutura do projeto
+
+- `tftp_packet.py`: constrói e interpreta pacotes TFTP (RRQ, WRQ, DATA, ACK, ERROR).
+- `tftp_server.py`: servidor TFTP que atende pedidos de leitura (RRQ) e escrita (WRQ) usando UDP.
+- `tftp_client.py`: cliente TFTP de linha de comando para enviar e baixar arquivos.
+- `arquivo_local.bin` / `arquivo_remoto.bin`: arquivos de teste usados durante o desenvolvimento.
+
+---
+
+### Como executar o servidor
+
+No diretório do projeto:
+
+```bash
+python tftp_server.py --host 0.0.0.0 --port 69 --base-dir .
+```
+
+Parâmetros principais:
+
+- `--host`: endereço IP em que o servidor vai escutar (padrão: `0.0.0.0`).
+- `--port`: porta UDP do servidor (padrão: `69`).
+- `--base-dir`: diretório base onde os arquivos serão lidos/gravados (padrão: diretório atual).
+
+> Em alguns sistemas, a porta 69 pode exigir privilégios de administrador. Se tiver problema, use outra porta, por exemplo `--port 6969`, e aponte o cliente para essa porta.
+
+---
+
+### Como usar o cliente
+
+#### Baixar arquivo do servidor (RRQ)
+
+```bash
+python tftp_client.py <host> get <nome_remoto> [nome_local]
+```
+
+Exemplos:
+
+```bash
+python tftp_client.py 127.0.0.1 get arquivo_remoto.bin
+python tftp_client.py 127.0.0.1 --port 6969 get arquivo_remoto.bin arquivo_local.bin
+```
+
+#### Enviar arquivo para o servidor (WRQ)
+
+```bash
+python tftp_client.py <host> put <arquivo_local> [nome_remoto]
+```
+
+Exemplos:
+
+```bash
+python tftp_client.py 127.0.0.1 put arquivo_local.bin
+python tftp_client.py 127.0.0.1 --port 6969 put arquivo_local.bin arquivo_remoto.bin
+```
+
+---
+
+### Comportamento e limitações
+
+- Implementa o modo `octet` (transferência binária).
+- Tamanho máximo de bloco: 512 bytes (`MAX_DATA_SIZE`).
+- Retransmissão simples em caso de timeout (até 3 tentativas em alguns fluxos).
+- Servidor usa threads para tratar múltiplas requisições em paralelo.
+- O servidor protege contra *path traversal* mantendo todos os arquivos dentro de `base_dir`.
+
+Este projeto foi feito para fins de estudo do protocolo TFTP e não deve ser usado em produção sem revisão de segurança adicional.
+
+## Testes
+
+### 1. Inicialização do servidor e logs posteriores
+![Inicialização do servidor e logs posteriores](<assets/1- Criação do servidor e logs posteriores.png>)
+
+### 2. Criação do arquivo para upload
+![Criação do arquivo para upload](<assets/2 - criação de arquivo para upload.png>)
+
+### 3. Upload de arquivo pelo cliente externo
+![Upload de arquivo pelo cliente externo](<assets/3 - upload de arquivo pelo cliente externo.png>)
+
+### 4. Download do arquivo pelo cliente externo
+![Download do arquivo pelo cliente externo](<assets/Screenshot 2026-03-17 153715.png>)
+
+### 5. Verificação do arquivo recebido
+![Verificação do arquivo recebido](<assets/Screenshot 2026-03-17 153644.png>)
